@@ -1,0 +1,89 @@
+[package]
+authors = ["Jacob Rosenthal"]
+categories = ["embedded", "hardware-support", "no-std"]
+description = "Rust support for the microbitv2 development board"
+keywords = ["arm", "cortex-m", "nrf52833", "hal"]
+license = "MIT OR Apache-2.0"
+name = "microbitv2-embassy"
+repository = "https://github.com/jacobrosenthal/microbitv2-rs"
+version = "0.0.1"
+edition = "2018"
+resolver = "2"
+
+[features]
+default = ["defmt-default", "ble-gatt-server"]
+defmt-default = []
+defmt-trace = []
+defmt-debug = []
+defmt-info = []
+defmt-warn = []
+defmt-error = []
+ble-gatt-server = ["nrf-softdevice/ble-gatt-server"]
+
+[dependencies]
+embassy = { version = "0.1.0", features = ["defmt"] }
+embassy-traits = { version = "0.1.0", features = ["defmt"] }
+embassy-nrf = { version = "0.1.0", features = ["defmt", "nrf52833"] }
+cortex-m = { version = "0.7.2" }
+cortex-m-rt = "0.7.0"
+defmt = { version = "0.2.0" }
+nrf-softdevice-defmt-rtt = { version = "0.1.0" }
+panic-probe = { version = "0.2.0", features = ["print-defmt"] }
+nrf-softdevice = { version = "0.1.0", features = [
+    "defmt",
+    "defmt-trace",
+    "nrf52833",
+    "s140",
+    "ble-peripheral",
+    "ble-central",
+    "critical-section-impl"
+] }
+nrf-softdevice-s140 = { version = "0.1.1" }
+futures = { version = "0.3.5", default-features = false }
+fixed = "1.2.0"
+heapless = "0.7.1"
+
+[patch.crates-io]
+embassy = { git = "https://github.com/embassy-rs/embassy" }
+embassy-nrf = { git = "https://github.com/embassy-rs/embassy" }
+embassy-macros = { git = "https://github.com/embassy-rs/embassy" }
+embassy-traits = { git = "https://github.com/embassy-rs/embassy" }
+nrf-softdevice-defmt-rtt = { git = "https://github.com/embassy-rs/nrf-softdevice" }
+nrf-softdevice = { git = "https://github.com/embassy-rs/nrf-softdevice" }
+nrf-softdevice-s140 = { git = "https://github.com/embassy-rs/nrf-softdevice" }
+
+# for cargo flash
+[package.metadata]
+chip = "nRF52833_xxAA"
+
+[profile.dev]
+codegen-units = 1
+debug = 2
+debug-assertions = true
+incremental = false
+opt-level = 3
+overflow-checks = true
+
+[profile.release]
+codegen-units = 1
+debug = 2
+debug-assertions = false
+incremental = false
+lto = "fat"
+opt-level = 's'
+overflow-checks = false
+
+# do not optimize proc-macro crates = faster builds from scratch
+[profile.dev.build-override]
+codegen-units = 8
+debug = false
+debug-assertions = false
+opt-level = 0
+overflow-checks = false
+
+[profile.release.build-override]
+codegen-units = 8
+debug = false
+debug-assertions = false
+opt-level = 0
+overflow-checks = false
