@@ -129,7 +129,7 @@ fn main() -> ! {
 
     let mut config = embassy_nrf::config::Config::default();
     config.gpiote_interrupt_priority = Priority::P2;
-    config.time_interrupt_priority = Priority::P2;
+    config.time_interrupt_priority = Priority::P7;
     let p = embassy_nrf::init(config);
 
     let config = nrf_softdevice::Config {
