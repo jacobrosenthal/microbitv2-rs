@@ -38,9 +38,8 @@ nrf-softdevice = { version = "0.1.0", features = [
     "defmt",
     "defmt-trace",
     "nrf52833",
-    "s140",
+    "s113",
     "ble-peripheral",
-    "ble-central",
     "critical-section-impl"
 ] }
 nrf-softdevice-s140 = { version = "0.1.1" }
