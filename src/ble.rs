@@ -1,8 +1,9 @@
 use defmt::{info, unwrap};
 use embassy_nrf::config::{Config, HfclkSource, LfclkSource};
-use embassy_nrf::gpio::AnyPin;
+use embassy_nrf::gpio::{self, AnyPin};
 use embassy_nrf::gpiote::{AnyChannel, InputChannel};
 use embassy_nrf::interrupt;
+use embedded_hal::digital::v2::OutputPin;
 use futures::FutureExt;
 use nrf_softdevice::ble::{gatt_server, peripheral};
 use nrf_softdevice::{raw, Softdevice};
@@ -11,7 +12,7 @@ use nrf_softdevice::{raw, Softdevice};
 #[nrf_softdevice::gatt_service(uuid = "9e7312e0-2354-11eb-9f10-fbc30a62cf38")]
 struct MyService {
     #[characteristic(uuid = "9e7312e0-2354-11eb-9f10-fbc30a63cf38", read, write)]
-    my_char: u16,
+    my_char: u8,
 }
 
 #[nrf_softdevice::gatt_server]
@@ -23,6 +24,7 @@ struct Server {
 pub async fn bluetooth_task(
     sd: &'static Softdevice,
     button1: InputChannel<'static, AnyChannel, AnyPin>,
+    mut led5: gpio::Output<'static, AnyPin>,
 ) {
     let server: Server = unwrap!(gatt_server::register(sd));
 
@@ -66,6 +68,11 @@ pub async fn bluetooth_task(
         let gatt_future = gatt_server::run(&conn, &server, |e| match e {
             ServerEvent::MyService(e) => match e {
                 MyServiceEvent::MyCharWrite(val) => {
+                    if val > 0 {
+                        unwrap!(led5.set_low());
+                    } else {
+                        unwrap!(led5.set_high());
+                    }
                     info!("wrote my_char: {}", val);
                 }
             },

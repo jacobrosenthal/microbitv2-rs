@@ -52,8 +52,14 @@ async fn main(spawner: Spawner, dp: Peripherals) {
         gpio::OutputDrive::Standard,
     );
 
+    let red5 = gpio::Output::new(
+        dp.P0_30.degrade(),
+        gpio::Level::High,
+        gpio::OutputDrive::Standard,
+    );
+
     unwrap!(spawner.spawn(softdevice_task(sd)));
-    unwrap!(spawner.spawn(bluetooth_task(sd, button1)));
+    unwrap!(spawner.spawn(bluetooth_task(sd, button1, red5)));
     unwrap!(spawner.spawn(blinky_task(red)));
 
     // we can sneak another 'task' here as well
