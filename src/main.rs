@@ -27,10 +27,13 @@ async fn main(spawner: Spawner, dp: Peripherals) {
     let config = softdevice_config();
     let sd = Softdevice::enable(&config);
 
+    // button presses will be delivered on LotoHi or when you release the button
     let button1 = gpiote::InputChannel::new(
+        // degrade just a typesystem hack to forget which pin it is so we can
+        // call it Anypin and make our function calls more generic
         dp.GPIOTE_CH1.degrade(),
         gpio::Input::new(dp.P0_14.degrade(), gpio::Pull::Up),
-        gpiote::InputChannelPolarity::HiToLo,
+        gpiote::InputChannelPolarity::LoToHi,
     );
 
     // microbit dosent have a single led, it has a matrix where you set the
@@ -38,8 +41,6 @@ async fn main(spawner: Spawner, dp: Peripherals) {
 
     // row1 permenantly powered
     let _row1 = gpio::Output::new(
-        // degrade just a typesystem hack to forget which pin it is so we can
-        // call it Anypin and make our function calls more generic
         dp.P0_21.degrade(),
         gpio::Level::High,
         gpio::OutputDrive::Standard,
