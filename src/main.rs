@@ -7,7 +7,7 @@
 #![feature(type_alias_impl_trait)]
 
 use nrf_softdevice_defmt_rtt as _; // global logger
-use panic_probe as _;
+use panic_probe as _; // print out panic messages
 mod ble;
 
 use ble::{bluetooth_task, embassy_config, softdevice_config, softdevice_task};
@@ -22,8 +22,10 @@ use nrf_softdevice::Softdevice;
 
 #[embassy::main(config = "embassy_config()")]
 async fn main(spawner: Spawner, dp: Peripherals) {
+    // well use these logging macros instead of println to tunnel our logs via the debug chip
     info!("Hello World!");
 
+    // some bluetooth under the covers stuff we need to start up
     let config = softdevice_config();
     let sd = Softdevice::enable(&config);
 
@@ -59,11 +61,14 @@ async fn main(spawner: Spawner, dp: Peripherals) {
         gpio::OutputDrive::Standard,
     );
 
+    // tell the executor to start each of our tasks
     unwrap!(spawner.spawn(softdevice_task(sd)));
+    // note this unwrap! macro is just like .unwrap() you're used to, but for
+    // various reasons has less size for microcontrollers
     unwrap!(spawner.spawn(bluetooth_task(sd, button1, red5)));
     unwrap!(spawner.spawn(blinky_task(red)));
 
-    // we can sneak another 'task' here as well
+    // we can sneak another 'task' here as well instead of exiting
     let mut red2 = gpio::Output::new(
         dp.P0_11.degrade(),
         gpio::Level::High,
@@ -88,6 +93,7 @@ async fn blinky_task(mut red: gpio::Output<'static, AnyPin>) {
     }
 }
 
+// just a bookkeeping function for our logging library
 // WARNING may overflow and wrap-around in long lived apps
 defmt::timestamp! {"{=usize}", {
         use core::sync::atomic::{AtomicUsize, Ordering};
