@@ -42,7 +42,7 @@ nrf-softdevice = { version = "0.1.0", features = [
     "ble-peripheral",
     "critical-section-impl"
 ] }
-nrf-softdevice-s140 = { version = "0.1.1" }
+nrf-softdevice-s113 = { version = "0.1.1" }
 futures = { version = "0.3.17", default-features = false, features = [
     "async-await"
 ] }
@@ -57,7 +57,7 @@ embassy-macros = { git = "https://github.com/embassy-rs/embassy" }
 embassy-traits = { git = "https://github.com/embassy-rs/embassy" }
 nrf-softdevice-defmt-rtt = { git = "https://github.com/embassy-rs/nrf-softdevice" }
 nrf-softdevice = { git = "https://github.com/embassy-rs/nrf-softdevice" }
-nrf-softdevice-s140 = { git = "https://github.com/embassy-rs/nrf-softdevice" }
+nrf-softdevice-s113 = { git = "https://github.com/embassy-rs/nrf-softdevice" }
 
 # for cargo flash
 [package.metadata]
