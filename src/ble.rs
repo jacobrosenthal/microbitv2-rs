@@ -100,7 +100,7 @@ pub fn softdevice_config() -> nrf_softdevice::Config {
             source: raw::NRF_CLOCK_LF_SRC_RC as u8,
             rc_ctiv: 16,
             rc_temp_ctiv: 2,
-            accuracy: 0,
+            accuracy: raw::NRF_CLOCK_LF_ACCURACY_250_PPM as u8,
         }),
         conn_gap: Some(raw::ble_gap_conn_cfg_t {
             conn_count: 1,
