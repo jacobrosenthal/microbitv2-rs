@@ -1,8 +1,6 @@
 use defmt::{info, unwrap};
-use embassy_nrf::config::{Config, HfclkSource, LfclkSource};
 use embassy_nrf::gpio::{self, AnyPin};
 use embassy_nrf::gpiote::{AnyChannel, InputChannel};
-use embassy_nrf::interrupt;
 use embedded_hal::digital::v2::OutputPin;
 use futures::FutureExt;
 use nrf_softdevice::ble::{gatt_server, peripheral};
@@ -95,12 +93,11 @@ pub async fn softdevice_task(sd: &'static Softdevice) {
 
 pub fn softdevice_config() -> nrf_softdevice::Config {
     nrf_softdevice::Config {
-        // todo shouldnt this be xtal?
         clock: Some(raw::nrf_clock_lf_cfg_t {
             source: raw::NRF_CLOCK_LF_SRC_RC as u8,
             rc_ctiv: 16,
             rc_temp_ctiv: 2,
-            accuracy: raw::NRF_CLOCK_LF_ACCURACY_250_PPM as u8,
+            accuracy: raw::NRF_CLOCK_LF_ACCURACY_20_PPM as u8,
         }),
         conn_gap: Some(raw::ble_gap_conn_cfg_t {
             conn_count: 1,
@@ -125,18 +122,4 @@ pub fn softdevice_config() -> nrf_softdevice::Config {
         }),
         ..Default::default()
     }
-}
-
-// 0 is Highest. Lower prio number can preempt higher prio number
-// Softdevice has reserved priorities 0, 1 and 3
-pub fn embassy_config() -> Config {
-    let mut config = Config::default();
-    // ?
-    // config.hfclk_source = HfclkSource::ExternalXtal;
-    // config.lfclk_source = LfclkSource::ExternalXtal;
-    // any reason not to run our timer as highest priority?
-    config.time_interrupt_priority = interrupt::Priority::P2;
-    // if we see button misses lower this
-    config.gpiote_interrupt_priority = interrupt::Priority::P7;
-    config
 }

@@ -10,13 +10,13 @@ use nrf_softdevice_defmt_rtt as _; // global logger
 use panic_probe as _; // print out panic messages
 mod ble;
 
-use ble::{bluetooth_task, embassy_config, softdevice_config, softdevice_task};
+use ble::{bluetooth_task, softdevice_config, softdevice_task};
 use defmt::{info, unwrap};
 use embassy::executor::Spawner;
 use embassy::time::{Duration, Timer};
 use embassy_nrf::gpio::{self, AnyPin, Pin};
 use embassy_nrf::gpiote::{self, Channel};
-use embassy_nrf::Peripherals;
+use embassy_nrf::{interrupt, Peripherals};
 use embedded_hal::digital::v2::OutputPin;
 use nrf_softdevice::Softdevice;
 
@@ -91,6 +91,18 @@ async fn blinky_task(mut red: gpio::Output<'static, AnyPin>) {
         unwrap!(red.set_low());
         Timer::after(Duration::from_millis(1000)).await;
     }
+}
+
+// 0 is Highest. Lower prio number can preempt higher prio number
+// Softdevice has reserved priorities 0, 1 and 3
+pub fn embassy_config() -> embassy_nrf::config::Config {
+    let mut config = embassy_nrf::config::Config::default();
+    config.hfclk_source = embassy_nrf::config::HfclkSource::ExternalXtal;
+    config.lfclk_source = embassy_nrf::config::LfclkSource::InternalRC;
+    config.time_interrupt_priority = interrupt::Priority::P2;
+    // if we see button misses lower this
+    config.gpiote_interrupt_priority = interrupt::Priority::P7;
+    config
 }
 
 // just a bookkeeping function for our logging library
