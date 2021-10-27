@@ -6,13 +6,14 @@ use futures::FutureExt;
 use nrf_softdevice::ble::{gatt_server, peripheral};
 use nrf_softdevice::{raw, Softdevice};
 
-// define a bluetooth service with one characteristic we can write and read to
+// Define a bluetooth service with one characteristic we can write and read to
 #[nrf_softdevice::gatt_service(uuid = "9e7312e0-2354-11eb-9f10-fbc30a62cf38")]
 struct MyService {
     #[characteristic(uuid = "9e7312e0-2354-11eb-9f10-fbc30a63cf38", read, write)]
     my_char: u8,
 }
 
+// Create the gatt server with however many services we've defined
 #[nrf_softdevice::gatt_server]
 struct Server {
     my_service: MyService,
@@ -86,11 +87,16 @@ pub async fn bluetooth_task(
     }
 }
 
+// This task is an implementation detail of the softdevice. It services the
+// softdevice under the hood which ultimately feeds events to our
+// gatt_server::run in the blutooth task
 #[embassy::task]
 pub async fn softdevice_task(sd: &'static Softdevice) {
     sd.run().await;
 }
 
+// This function is an implementation detail of the softdevice. It configures
+// the underlying softdevice with all the bluetooth settings and buffer sizes.
 pub fn softdevice_config() -> nrf_softdevice::Config {
     nrf_softdevice::Config {
         clock: Some(raw::nrf_clock_lf_cfg_t {

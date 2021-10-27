@@ -1,5 +1,10 @@
 //! https://tech.microbit.org/hardware/
 //!
+//! Blinks 2 leds from two different tasks, and at the same time waits for a
+//! button press to advertise a bluetooth led service. If you connect to
+//! bluetooth and write a u8 > 0 it will enable the third led, if you write 0 it
+//! will disable it.
+//!
 //! cargo run --release
 
 #![no_main]
@@ -93,8 +98,9 @@ async fn blinky_task(mut red: gpio::Output<'static, AnyPin>) {
     }
 }
 
+// Configure clocks and interrupt priorities for our microcontroller
 // 0 is Highest. Lower prio number can preempt higher prio number
-// Softdevice has reserved priorities 0, 1 and 3
+// Softdevice has reserved priorities 0, 1 and 3 so we avoid those
 pub fn embassy_config() -> embassy_nrf::config::Config {
     let mut config = embassy_nrf::config::Config::default();
     config.hfclk_source = embassy_nrf::config::HfclkSource::ExternalXtal;
@@ -105,7 +111,7 @@ pub fn embassy_config() -> embassy_nrf::config::Config {
     config
 }
 
-// just a bookkeeping function for our logging library
+// Just a bookkeeping function for our logging library
 // WARNING may overflow and wrap-around in long lived apps
 defmt::timestamp! {"{=usize}", {
         use core::sync::atomic::{AtomicUsize, Ordering};
