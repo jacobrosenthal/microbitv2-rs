@@ -1,187 +1,125 @@
-//! cargo flash --release
+//! https://tech.microbit.org/hardware/
+//!
+//! Blinks 2 leds from two different tasks, and at the same time waits for a
+//! button press to advertise a bluetooth led service. If you connect to
+//! bluetooth and write a u8 > 0 it will enable the third led, if you write 0 it
+//! will disable it.
+//!
+//! cargo run --release
 
-#![no_std]
 #![no_main]
+#![no_std]
 #![feature(type_alias_impl_trait)]
-#![allow(incomplete_features)]
 
-use embassy_nrf as _;
 use nrf_softdevice_defmt_rtt as _; // global logger
-use panic_probe as _;
+use panic_probe as _; // print out panic messages
+mod ble;
 
-use core::mem;
-use cortex_m_rt::entry;
+use ble::{bluetooth_task, softdevice_config, softdevice_task};
 use defmt::{info, unwrap};
-use embassy::executor::Executor;
-use embassy::traits::gpio::WaitForLow;
-use embassy::util::Forever;
-use embassy_nrf::gpio::{AnyPin, Input, Pin as _, Pull};
-use embassy_nrf::gpiote::PortInput;
-use embassy_nrf::interrupt::Priority;
+use embassy::executor::Spawner;
+use embassy::time::{Duration, Timer};
+use embassy_nrf::gpio::{self, AnyPin, Pin};
+use embassy_nrf::gpiote::{self, Channel};
+use embassy_nrf::{interrupt, Peripherals};
+use embedded_hal::digital::v2::OutputPin;
+use nrf_softdevice::Softdevice;
 
-use futures::pin_mut;
-
-use nrf_softdevice::ble::{gatt_server, peripheral};
-use nrf_softdevice::{raw, Softdevice};
-
-static EXECUTOR: Forever<Executor> = Forever::new();
-
-#[embassy::task]
-async fn softdevice_task(sd: &'static Softdevice) {
-    sd.run().await;
-}
-
-#[nrf_softdevice::gatt_server(uuid = "9e7312e0-2354-11eb-9f10-fbc30a62cf38")]
-struct FooService {
-    #[characteristic(uuid = "9e7312e0-2354-11eb-9f10-fbc30a63cf38", read, write, notify)]
-    foo: u16,
-}
-
-async fn run_bluetooth(sd: &'static Softdevice, server: &FooService) {
-    #[rustfmt::skip]
-    let adv_data = &[
-        0x02, 0x01, raw::BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE as u8,
-        0x03, 0x03, 0x09, 0x18,
-        0x0a, 0x09, b'H', b'e', b'l', b'l', b'o', b'R', b'u', b's', b't',
-    ];
-    #[rustfmt::skip]
-    let scan_data = &[
-        0x03, 0x03, 0x09, 0x18,
-    ];
-
-    loop {
-        let config = peripheral::Config::default();
-        let adv = peripheral::ConnectableAdvertisement::ScannableUndirected {
-            adv_data,
-            scan_data,
-        };
-        let conn = unwrap!(peripheral::advertise_connectable(sd, adv, &config).await);
-
-        info!("advertising done!");
-
-        let res = gatt_server::run(&conn, server, |e| match e {
-            FooServiceEvent::FooWrite(val) => {
-                info!("wrote foo level: {}", val);
-                if let Err(e) = server.foo_notify(&conn, val + 1) {
-                    info!("send notification error: {:?}", e);
-                }
-            }
-            FooServiceEvent::FooNotificationsEnabled => info!("notifications enabled"),
-            FooServiceEvent::FooNotificationsDisabled => info!("notifications disabled"),
-        })
-        .await;
-
-        if let Err(e) = res {
-            info!("gatt_server run exited with error: {:?}", e);
-        }
-    }
-}
-
-#[embassy::task]
-async fn bluetooth_task(sd: &'static Softdevice, button1: AnyPin, button2: AnyPin) {
-    let server: FooService = unwrap!(gatt_server::register(sd));
-
-    info!("Bluetooth is OFF");
-    info!("Press microbit-v2 button 1 to enable, button 2 to disable");
-
-    let button1 = PortInput::new(Input::new(button1, Pull::Up));
-    let button2 = PortInput::new(Input::new(button2, Pull::Up));
-    pin_mut!(button1);
-    pin_mut!(button2);
-    loop {
-        button1.as_mut().wait_for_low().await;
-        info!("Bluetooth ON!");
-
-        // Create a future that will run the bluetooth loop.
-        // Note the lack of `.await`! This creates the future but doesn't poll it yet.
-        let bluetooth_fut = run_bluetooth(sd, &server);
-
-        // Create a future that will resolve when the OFF button is pressed.
-        let off_fut = async {
-            button2.as_mut().wait_for_low().await;
-            info!("Bluetooth OFF!");
-        };
-
-        pin_mut!(bluetooth_fut);
-        pin_mut!(off_fut);
-
-        // Select the two futures.
-        //
-        // select() returns when one of the two futures returns. The other future is dropped before completing.
-        //
-        // Since the bluetooth future never finishes, this can only happen when the Off button is pressed.
-        // This will cause the bluetooth future to be dropped.
-        //
-        // If it was advertising, the nested `peripheral::advertise_connectable` future will be dropped, which will cause
-        // the softdevice to stop advertising.
-        // If it was connected, it will drop everything including the `Connection` instance, which
-        // will tell the softdevice to disconnect it.
-        //
-        // This demonstrates the awesome power of Rust's async-await combined with nrf-softdevice's async wrappers.
-        // It's super easy to cancel a complex tree of operations: just drop its future!
-        futures::future::select(bluetooth_fut, off_fut).await;
-    }
-}
-
-#[entry]
-fn main() -> ! {
+#[embassy::main(config = "embassy_config()")]
+async fn main(spawner: Spawner, dp: Peripherals) {
+    // well use these logging macros instead of println to tunnel our logs via the debug chip
     info!("Hello World!");
 
-    let mut config = embassy_nrf::config::Config::default();
-    config.gpiote_interrupt_priority = Priority::P2;
-    config.time_interrupt_priority = Priority::P7;
-    let p = embassy_nrf::init(config);
-
-    let config = nrf_softdevice::Config {
-        clock: Some(raw::nrf_clock_lf_cfg_t {
-            source: raw::NRF_CLOCK_LF_SRC_RC as u8,
-            rc_ctiv: 4,
-            rc_temp_ctiv: 2,
-            accuracy: 7,
-        }),
-        conn_gap: Some(raw::ble_gap_conn_cfg_t {
-            conn_count: 6,
-            event_length: 24,
-        }),
-        conn_gatt: Some(raw::ble_gatt_conn_cfg_t { att_mtu: 256 }),
-        gatts_attr_tab_size: Some(raw::ble_gatts_cfg_attr_tab_size_t {
-            attr_tab_size: 32768,
-        }),
-        gap_role_count: Some(raw::ble_gap_cfg_role_count_t {
-            adv_set_count: 1,
-            periph_role_count: 3,
-            central_role_count: 3,
-            central_sec_count: 0,
-            _bitfield_1: raw::ble_gap_cfg_role_count_t::new_bitfield_1(0),
-        }),
-        gap_device_name: Some(raw::ble_gap_cfg_device_name_t {
-            p_value: b"HelloRust" as *const u8 as _,
-            current_len: 9,
-            max_len: 9,
-            write_perm: unsafe { mem::zeroed() },
-            _bitfield_1: raw::ble_gap_cfg_device_name_t::new_bitfield_1(
-                raw::BLE_GATTS_VLOC_STACK as u8,
-            ),
-        }),
-        ..Default::default()
-    };
-
+    // some bluetooth under the covers stuff we need to start up
+    let config = softdevice_config();
     let sd = Softdevice::enable(&config);
 
-    let executor = EXECUTOR.put(Executor::new());
-    executor.run(|spawner| {
-        unwrap!(spawner.spawn(softdevice_task(sd)));
-        unwrap!(spawner.spawn(bluetooth_task(sd, p.P0_14.degrade(), p.P0_23.degrade())));
-    });
+    // button presses will be delivered on LotoHi or when you release the button
+    let button1 = gpiote::InputChannel::new(
+        // degrade just a typesystem hack to forget which pin it is so we can
+        // call it Anypin and make our function calls more generic
+        dp.GPIOTE_CH1.degrade(),
+        gpio::Input::new(dp.P0_14.degrade(), gpio::Pull::Up),
+        gpiote::InputChannelPolarity::LoToHi,
+    );
+
+    // microbit dosent have a single led, it has a matrix where you set the
+    // column high AND row low for the led you want to turn on.
+
+    // row1 permenantly powered
+    let _row1 = gpio::Output::new(
+        dp.P0_21.degrade(),
+        gpio::Level::High,
+        gpio::OutputDrive::Standard,
+    );
+
+    // The column pins are active low, start leds high (off)
+    let red = gpio::Output::new(
+        dp.P0_28.degrade(),
+        gpio::Level::High,
+        gpio::OutputDrive::Standard,
+    );
+
+    let red5 = gpio::Output::new(
+        dp.P0_30.degrade(),
+        gpio::Level::High,
+        gpio::OutputDrive::Standard,
+    );
+
+    // tell the executor to start each of our tasks
+    unwrap!(spawner.spawn(softdevice_task(sd)));
+    // note this unwrap! macro is just like .unwrap() you're used to, but for
+    // various reasons has less size for microcontrollers
+    unwrap!(spawner.spawn(bluetooth_task(sd, button1, red5)));
+    unwrap!(spawner.spawn(blinky_task(red)));
+
+    // we can sneak another 'task' here as well instead of exiting
+    let mut red2 = gpio::Output::new(
+        dp.P0_11.degrade(),
+        gpio::Level::High,
+        gpio::OutputDrive::Standard,
+    );
+
+    loop {
+        unwrap!(red2.set_low());
+        Timer::after(Duration::from_millis(1000)).await;
+        unwrap!(red2.set_high());
+        Timer::after(Duration::from_millis(1000)).await;
+    }
 }
 
-defmt::timestamp! {"{=u64}", {
+#[embassy::task]
+async fn blinky_task(mut red: gpio::Output<'static, AnyPin>) {
+    loop {
+        unwrap!(red.set_high());
+        Timer::after(Duration::from_millis(1000)).await;
+        unwrap!(red.set_low());
+        Timer::after(Duration::from_millis(1000)).await;
+    }
+}
+
+// Configure clocks and interrupt priorities for our microcontroller
+// 0 is Highest. Lower prio number can preempt higher prio number
+// Softdevice has reserved priorities 0, 1 and 3 so we avoid those
+pub fn embassy_config() -> embassy_nrf::config::Config {
+    let mut config = embassy_nrf::config::Config::default();
+    config.hfclk_source = embassy_nrf::config::HfclkSource::ExternalXtal;
+    config.lfclk_source = embassy_nrf::config::LfclkSource::InternalRC;
+    config.time_interrupt_priority = interrupt::Priority::P2;
+    // if we see button misses lower this
+    config.gpiote_interrupt_priority = interrupt::Priority::P7;
+    config
+}
+
+// Just a bookkeeping function for our logging library
+// WARNING may overflow and wrap-around in long lived apps
+defmt::timestamp! {"{=usize}", {
         use core::sync::atomic::{AtomicUsize, Ordering};
 
         static COUNT: AtomicUsize = AtomicUsize::new(0);
         // NOTE(no-CAS) `timestamps` runs with interrupts disabled
         let n = COUNT.load(Ordering::Relaxed);
         COUNT.store(n + 1, Ordering::Relaxed);
-        n as u64
+        n
     }
 }

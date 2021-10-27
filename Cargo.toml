@@ -29,24 +29,26 @@ embassy-nrf = { version = "0.1.0", features = [
     "time-driver-rtc1",
     "gpiote"
 ] }
-cortex-m = { version = "0.7.2" }
+cortex-m = { version = "0.7.3" }
 cortex-m-rt = "0.7.0"
-defmt = { version = "0.2.0" }
+defmt = { version = "0.2.3" }
 nrf-softdevice-defmt-rtt = { version = "0.1.0" }
-panic-probe = { version = "0.2.0", features = ["print-defmt"] }
+panic-probe = { version = "0.2.1", features = ["print-defmt"] }
 nrf-softdevice = { version = "0.1.0", features = [
     "defmt",
     "defmt-trace",
     "nrf52833",
-    "s140",
+    "s113",
     "ble-peripheral",
-    "ble-central",
     "critical-section-impl"
 ] }
-nrf-softdevice-s140 = { version = "0.1.1" }
-futures = { version = "0.3.5", default-features = false }
-fixed = "1.2.0"
-heapless = "0.7.1"
+nrf-softdevice-s113 = { version = "0.1.1" }
+futures = { version = "0.3.17", default-features = false, features = [
+    "async-await"
+] }
+fixed = "1.10.0"
+heapless = "0.7.7"
+embedded-hal = "0.2.6"
 
 [patch.crates-io]
 embassy = { git = "https://github.com/embassy-rs/embassy" }
@@ -55,7 +57,7 @@ embassy-macros = { git = "https://github.com/embassy-rs/embassy" }
 embassy-traits = { git = "https://github.com/embassy-rs/embassy" }
 nrf-softdevice-defmt-rtt = { git = "https://github.com/embassy-rs/nrf-softdevice" }
 nrf-softdevice = { git = "https://github.com/embassy-rs/nrf-softdevice" }
-nrf-softdevice-s140 = { git = "https://github.com/embassy-rs/nrf-softdevice" }
+nrf-softdevice-s113 = { git = "https://github.com/embassy-rs/nrf-softdevice" }
 
 # for cargo flash
 [package.metadata]
