@@ -10,6 +10,7 @@
 #![no_main]
 #![no_std]
 #![feature(type_alias_impl_trait)]
+#![feature(array_chunks)]
 
 use nrf_softdevice_defmt_rtt as _; // global logger
 use panic_probe as _; // print out panic messages
@@ -19,8 +20,7 @@ use ble::{bluetooth_task, softdevice_config, softdevice_task};
 use defmt::{info, unwrap};
 use embassy::executor::Spawner;
 use embassy::time::{Duration, Timer};
-use embassy_nrf::gpio::{self, AnyPin, Pin};
-use embassy_nrf::gpiote::{self, Channel};
+use embassy_nrf::gpio::{self, Pin};
 use embassy_nrf::{interrupt, Peripherals};
 use embedded_hal::digital::v2::OutputPin;
 use nrf_softdevice::Softdevice;
@@ -34,44 +34,11 @@ async fn main(spawner: Spawner, dp: Peripherals) {
     let config = softdevice_config();
     let sd = Softdevice::enable(&config);
 
-    // button presses will be delivered on LotoHi or when you release the button
-    let button1 = gpiote::InputChannel::new(
-        // degrade just a typesystem hack to forget which pin it is so we can
-        // call it Anypin and make our function calls more generic
-        dp.GPIOTE_CH1.degrade(),
-        gpio::Input::new(dp.P0_14.degrade(), gpio::Pull::Up),
-        gpiote::InputChannelPolarity::LoToHi,
-    );
-
-    // microbit dosent have a single led, it has a matrix where you set the
-    // column high AND row low for the led you want to turn on.
-
-    // row1 permenantly powered
-    let _row1 = gpio::Output::new(
-        dp.P0_21.degrade(),
-        gpio::Level::High,
-        gpio::OutputDrive::Standard,
-    );
-
-    // The column pins are active low, start leds high (off)
-    let red = gpio::Output::new(
-        dp.P0_28.degrade(),
-        gpio::Level::High,
-        gpio::OutputDrive::Standard,
-    );
-
-    let red5 = gpio::Output::new(
-        dp.P0_30.degrade(),
-        gpio::Level::High,
-        gpio::OutputDrive::Standard,
-    );
-
     // tell the executor to start each of our tasks
     unwrap!(spawner.spawn(softdevice_task(sd)));
     // note this unwrap! macro is just like .unwrap() you're used to, but for
     // various reasons has less size for microcontrollers
-    unwrap!(spawner.spawn(bluetooth_task(sd, button1, red5)));
-    unwrap!(spawner.spawn(blinky_task(red)));
+    unwrap!(spawner.spawn(bluetooth_task(sd)));
 
     // we can sneak another 'task' here as well instead of exiting
     let mut red2 = gpio::Output::new(
@@ -84,16 +51,6 @@ async fn main(spawner: Spawner, dp: Peripherals) {
         unwrap!(red2.set_low());
         Timer::after(Duration::from_millis(1000)).await;
         unwrap!(red2.set_high());
-        Timer::after(Duration::from_millis(1000)).await;
-    }
-}
-
-#[embassy::task]
-async fn blinky_task(mut red: gpio::Output<'static, AnyPin>) {
-    loop {
-        unwrap!(red.set_high());
-        Timer::after(Duration::from_millis(1000)).await;
-        unwrap!(red.set_low());
         Timer::after(Duration::from_millis(1000)).await;
     }
 }
