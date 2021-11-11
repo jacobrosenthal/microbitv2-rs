@@ -19,6 +19,11 @@ struct Server {
     ble_io: BleIo,
 }
 
+struct ConfiguredOutput<'a> {
+    pin_nbr: usize,
+    output: Output<'a, AnyPin>,
+}
+
 #[embassy::task]
 pub async fn bluetooth_task(sd: &'static Softdevice) {
     let server: Server = unwrap!(gatt_server::register(sd));
@@ -41,25 +46,32 @@ pub async fn bluetooth_task(sd: &'static Softdevice) {
     let config = peripheral::Config::default();
 
     // https://tech.microbit.org/hardware/schematic/
-    let p0 = gpio::Output::new(
-        dp.P0_02.degrade(),
-        gpio::Level::Low,
-        gpio::OutputDrive::Standard,
-    );
 
-    let p1 = gpio::Output::new(
-        dp.P0_03.degrade(),
-        gpio::Level::Low,
-        gpio::OutputDrive::Standard,
-    );
+    let mut mapping: [Option<AnyPin>; 21] = [
+        Some(dp.P0_02.degrade()),
+        Some(dp.P0_03.degrade()),
+        Some(dp.P0_04.degrade()),
+        Some(dp.P0_31.degrade()),
+        Some(dp.P0_28.degrade()),
+        Some(dp.P0_14.degrade()),
+        Some(dp.P1_05.degrade()),
+        Some(dp.P0_11.degrade()),
+        Some(dp.P0_10.degrade()),
+        Some(dp.P0_09.degrade()),
+        Some(dp.P0_30.degrade()),
+        Some(dp.P0_23.degrade()),
+        Some(dp.P0_12.degrade()),
+        Some(dp.P0_17.degrade()),
+        Some(dp.P0_01.degrade()),
+        Some(dp.P0_13.degrade()),
+        Some(dp.P1_02.degrade()),
+        None,
+        None,
+        Some(dp.P0_26.degrade()),
+        Some(dp.P1_00.degrade()),
+    ];
 
-    let p2 = gpio::Output::new(
-        dp.P0_04.degrade(),
-        gpio::Level::Low,
-        gpio::OutputDrive::Standard,
-    );
-
-    let mut pins: [Output<AnyPin>; 3] = [p0, p1, p2];
+    let mut digitals: heapless::Vec<ConfiguredOutput, 21> = heapless::Vec::new();
 
     loop {
         info!("advertising!");
@@ -76,19 +88,41 @@ pub async fn bluetooth_task(sd: &'static Softdevice) {
                 BleIoEvent::DigitalWrite(val) => {
                     val.array_chunks::<2>().for_each(|a| {
                         // u8 fits in usize always
-                        let p = a[0] as usize;
+                        let requested_pin = a[0] as usize;
 
-                        // look up the pin the user asked for in our pins array
-                        if let Some(pin) = pins.iter_mut().nth(p) {
-                            let val = a[1];
+                        // did the user supply a rational pin number?
+                        if let Some(possible_pin) = mapping.iter_mut().nth(requested_pin) {
+                            // pin configured yet, so its still in the mapping array
+                            if let Some(pin) = possible_pin.take() {
+                                let value = if a[1] > 0 {
+                                    gpio::Level::High
+                                } else {
+                                    gpio::Level::Low
+                                };
 
-                            if val > 0 {
-                                info!("setting pin {} high", p);
-                                unwrap!(pin.set_high());
-                            } else {
-                                info!("setting pin {} low", p);
-                                unwrap!(pin.set_low());
+                                let output =
+                                    gpio::Output::new(pin, value, gpio::OutputDrive::Standard);
+                                // how to index it back? put it at the nth position?
+                                let _ = digitals.push(ConfiguredOutput {
+                                    pin_nbr: requested_pin,
+                                    output,
+                                });
                             }
+                            // else its already configured as a digital? how to check if its configured as something else
+                            else {
+                                digitals
+                                    .iter_mut()
+                                    .filter(|a| a.pin_nbr == requested_pin)
+                                    .for_each(|configured| {
+                                        if a[1] > 0 {
+                                            unwrap!(configured.output.set_high());
+                                        } else {
+                                            unwrap!(configured.output.set_high());
+                                        }
+                                    })
+                            }
+                        } else {
+                            // bad pin nbr
                         }
                     });
                 }
