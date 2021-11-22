@@ -10,7 +10,7 @@ Embassy requires a specific version of nightly. You won't have to do anything th
 
 ## Running
 
-Now you should be able to run `cargo run --release` to build, run and debug the program.
+Now you should be able to run `DEFMT_LOG=trace cargo run --release` to build, run and debug the program.
 
 ```console
 $ cargo run --release

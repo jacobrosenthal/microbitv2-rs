@@ -5,7 +5,7 @@
 //! bluetooth and write a u8 > 0 it will enable the third led, if you write 0 it
 //! will disable it.
 //!
-//! cargo run --release
+//! DEFMT_LOG=trace cargo run --release
 
 #![no_main]
 #![no_std]
