@@ -10,7 +10,7 @@ use nrf_softdevice::{raw, Softdevice};
 struct BleIo {
     // todo what max, notifications
     #[characteristic(uuid = "2a56", read, write)]
-    digital: heapless::Vec<u8, 16>,
+    digital: [u8; 16],
 }
 
 // Create the gatt server with however many services we've defined
