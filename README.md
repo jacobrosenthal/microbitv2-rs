@@ -35,11 +35,11 @@ $ cargo run --release
 
 ### timed out
 
-If your program uploads but gives time outs, maybe you lost the preinstalled softdevice off your microbit at some point. We can restore it with
+If your program uploads but then times out, maybe you lost the preinstalled softdevice off your microbit at some point. We can restore it with
 
 * Install probe-rs-cli `cargo install probe-rs-cli`
 * Download [SoftDevice S113](https://www.nordicsemi.com/Software-and-tools/Software/S113/Download) from Nordic. Supported versions are 7.x.x and unzip it to get the .hex file
-*`probe-rs-cli download --format hex s113_nrf52_7.3.0_softdevice.hex --chip nRF52833_xxAA`
+* `probe-rs-cli download --format hex s113_nrf52_7.3.0_softdevice.hex --chip nRF52833_xxAA --chip-erase`
 
 ### Error: no probe was found
 
