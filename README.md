@@ -33,16 +33,16 @@ $ cargo run --release
 
 ## Over the air bootloader
 
-Using the bootloader means we can't use our `cargo run` workflow anymore so youd probably not use this method until you need it. When that time comes you'll need to flash a secure bootloader and sign your compiled files with a few more dependencies:
+Using the bootloader means we can't use our probe-run workflow anymore so you'd probably not use this method until you need it. When that time comes you'll need to flash a secure bootloader and sign your compiled files with a few more dependencies:
 
 * `pip install nrfutil`
 * `cargo install cargo-make`
 
-There's a private.key (which thus isn't particuarly private but good enough for testing) as well as a prebuilt bootloader included in this directory, we can upload the softdevice and the secure bootloader to a connected device with:
+There's a private.key (which thus isn't particuarly private but good enough for testing) as well as the corresponding bootloader, with the public key, included in this directory. We can upload the softdevice and the secure bootloader to a connected device with:
 
 * `cargo make first`
 
-With the secure bootloader we now can't use `cargo run` anymore but we can still load our code via command line with: (Make sure to increase APP value EVERY time you upload)
+With the secure bootloader we can no longer use probe-run but we can still load our code via command line with: (Make sure to increase APP value EVERY time you upload)
 
 * `cargo make --env APP=1 flash`
 
@@ -50,11 +50,11 @@ When you're done testing you can create a package at target/app_dfu_package.zip 
 
 * `cargo make --env APP=2 pkg`
 
-This signed package can be upload to the device via the [nrfConnect](https://www.nordicsemi.com/Products/Development-tools/nRF-Connect-for-mobile)
+This signed package can be upload to the device via the [nrfConnect](https://www.nordicsemi.com/Products/Development-tools/nRF-Connect-for-mobile). Connect to the device, and choose the DFU icon, and select your package to upload.
 
-Note if you want to go back to using probe-run you'll need to go back to prerequisites and erease the device and reupload the softdevice to get rid of the secured bootloader.
+Finally for distributing for real you'll need to generate your own private key (and keep it private) and recreate the bootloader for your new public key.
 
-Finally for distributing for real you'll need to generate your own private key (and keep it private) and you may want to customize the bootloader as well.
+Note if you want to go back to using probe-run you'll need to go back to prerequisites and erease the device and reupload just the softdevice to get rid of the secured bootloader.
 
 ## Troubleshooting
 
