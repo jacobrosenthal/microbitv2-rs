@@ -6,6 +6,10 @@
 //! will disable it.
 //!
 //! DEFMT_LOG=trace cargo run --release
+//!
+//! Finally, if the optional ota bootloader is flashed and that process
+//! followed, you can flash updates over bluetooth with the nRF Connect desktop,
+//! iOS and Android apps.
 
 #![no_main]
 #![no_std]

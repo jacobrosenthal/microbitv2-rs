@@ -50,11 +50,11 @@ When you're done testing you can create a package at target/app_dfu_package.zip 
 
 * `cargo make --env APP=2 pkg`
 
-This signed package can be upload to the device via the [nrfConnect](https://www.nordicsemi.com/Products/Development-tools/nRF-Connect-for-mobile). Connect to the device, and choose the DFU icon, and select your package to upload.
+This signed package can be upload to the device via the [nRF Connect](https://www.nordicsemi.com/Products/Development-tools/nRF-Connect-for-mobile). Connect to the device, and choose the DFU icon, and select your package to upload.
 
 Finally for distributing for real you'll need to generate your own private key (and keep it private) and recreate the bootloader for your new public key.
 
-Note if you want to go back to using probe-run you'll need to go back to prerequisites and erease the device and reupload just the softdevice to get rid of the secured bootloader.
+Note if you want to go back to using probe-run you'll need to go back to prerequisites and reupload just the softdevice which will erase and remove the secure bootloader.
 
 ## Troubleshooting
 
