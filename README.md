@@ -31,6 +31,31 @@ $ cargo run --release
 └─ microbitv2_embassy::ble::bluetooth_task::task::{generator#0}::{closure#2} @ src/ble.rs:44
 ```
 
+## Over the air bootloader
+
+Using the bootloader means we can't use our `cargo run` workflow anymore so youd probably not use this method until you need it. When that time comes you'll need to flash a secure bootloader and sign your compiled files with a few more dependencies:
+
+* `pip install nrfutil`
+* `cargo install cargo-make`
+
+There's a private.key (which thus isn't particuarly private but good enough for testing) as well as a prebuilt bootloader included in this directory, we can upload the softdevice and the secure bootloader to a connected device with:
+
+* `cargo make first`
+
+With the secure bootloader we now can't use `cargo run` anymore but we can still load our code via command line with: (Make sure to increase APP value EVERY time you upload)
+
+* `cargo make --env APP=1 flash`
+
+When you're done testing you can create a package at target/app_dfu_package.zip to use yourself or distribute to your users with:
+
+* `cargo make --env APP=2 pkg`
+
+This signed package can be upload to the device via the [nrfConnect](https://www.nordicsemi.com/Products/Development-tools/nRF-Connect-for-mobile)
+
+Note if you want to go back to using probe-run you'll need to go back to prerequisites and erease the device and reupload the softdevice to get rid of the secured bootloader.
+
+Finally for distributing for real you'll need to generate your own private key (and keep it private) and you may want to customize the bootloader as well.
+
 ## Troubleshooting
 
 ### timed out
@@ -50,26 +75,7 @@ On linux in order to interact with the usb device you'll need something like fol
 SUBSYSTEM=="usb", ATTR{idVendor}=="0d28", ATTR{idProduct}=="0204", MODE:="666"
 ```
 
-## Over the air bootloader
-
-To upload a secure bootloader and update the app over the air we need some dependencies
-
-* `pip install nrfutil`
-* `cargo install cargo-make`
-
-Follow the directions below to generate a private key. Then with that private.key and the included bootloader in this directory, we can upload the softdevice and bootloader to a connected device
-
-* `cargo make first`
-
-Now we test our app on the devic without OTA. Make sure to increase APP EVERY time you upload.
-
-* `cargo make --env APP=1 flash`
-
-When you're done testing you can create a package at target/app_dfu_package.zip to upload via the [nrfConnect](https://www.nordicsemi.com/Products/Development-tools/nRF-Connect-for-mobile) with
-
-* `cargo make --env APP=2 pkg`
-
-Note if you want to go back to using probe-run you'll need to go back to prerequisites and erease the device and reupload the softdevice to get rid of the secured bootloader.
+## Advanced
 
 ## Generating a private key
 
