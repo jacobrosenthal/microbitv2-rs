@@ -124,73 +124,28 @@ pub fn dfu_task(
 ) {
     info!("wrote dfu instruction: {}", &val[..]);
 
-    match val[0] {
-        DFU_OP_ENTER_BOOTLOADER => {
-            // enter DFU mode
-            unsafe {
-                raw::sd_power_gpregret_clr(0, 0);
-                let gpregret_mask = (0xB0 | 0x01) as u32;
-                raw::sd_power_gpregret_set(0, gpregret_mask);
-            }
-
-            let mut resp: heapless::Vec<u8, 16> = heapless::Vec::new();
-            resp.push(DFU_OP_RESPONSE_CODE).unwrap();
-            resp.push(DFU_OP_ENTER_BOOTLOADER).unwrap();
-            resp.push(DFU_RSP_SUCCESS).unwrap();
-
-            // NOTE that indications are not yet supported but we need one for the nrf connect python app to work
-            if let Err(e) = server.dfu.dfu_notify(conn, resp) {
-                info!("send notification error: {:?}", e);
-            }
-
-            // delay(80000000); // not sure if this is required (1 second delay)
-
-            info!("gpregret_mask set. Soft resetting defice...");
-            cortex_m::peripheral::SCB::sys_reset();
+    if val[0] == DFU_OP_ENTER_BOOTLOADER {
+        // enter DFU mode
+        unsafe {
+            raw::sd_power_gpregret_clr(0, 0);
+            let gpregret_mask = (0xB0 | 0x01) as u32;
+            raw::sd_power_gpregret_set(0, gpregret_mask);
         }
-        DFU_OP_SET_ADV_NAME => {
-            // change advertisement name
-            // Security Mode 1 Level 1: No security is needed (aka open link).
-            let write_perm = raw::ble_gap_conn_sec_mode_t::new_bitfield_1(1, 1);
-            let len = val[1] as usize;
-            let dev_name = &val[2..len + 2];
 
-            info!(
-                "setting adv name to {}",
-                core::str::from_utf8(dev_name).unwrap()
-            );
+        let mut resp: heapless::Vec<u8, 16> = heapless::Vec::new();
+        resp.push(DFU_OP_RESPONSE_CODE).unwrap();
+        resp.push(DFU_OP_ENTER_BOOTLOADER).unwrap();
+        resp.push(DFU_RSP_SUCCESS).unwrap();
 
-            unsafe {
-                raw::sd_ble_gap_device_name_set(
-                    &write_perm as *const _ as *const raw::ble_gap_conn_sec_mode_t,
-                    dev_name as *const _ as *const u8,
-                    len as u16,
-                );
-            }
-
-            let mut resp: heapless::Vec<u8, 16> = heapless::Vec::new();
-            resp.push(DFU_OP_RESPONSE_CODE).unwrap();
-            resp.push(DFU_OP_SET_ADV_NAME).unwrap();
-            resp.push(DFU_RSP_OP_CODE_NOT_SUPPORTED).unwrap();
-
-            if let Err(e) = server.dfu.dfu_set(resp) {
-                info!("set error: {:?}", e);
-            }
-
-            let mut resp: heapless::Vec<u8, 16> = heapless::Vec::new();
-            resp.push(DFU_OP_RESPONSE_CODE).unwrap();
-            resp.push(DFU_OP_SET_ADV_NAME).unwrap();
-            resp.push(DFU_RSP_OP_CODE_NOT_SUPPORTED).unwrap();
-
-            if let Err(e) = server.dfu.dfu_notify(conn, resp) {
-                info!("send notification error: {:?}", e);
-            }
-
-            info!("adv name set successfully");
+        // NOTE that indications are not yet supported but we need one for the nrf connect python app to work
+        if let Err(e) = server.dfu.dfu_notify(conn, resp) {
+            info!("send notification error: {:?}", e);
         }
-        _ => {
-            // TODO: send error response
-        }
+
+        // delay(80000000); // not sure if this is required (1 second delay)
+
+        info!("gpregret_mask set. Soft resetting defice...");
+        cortex_m::peripheral::SCB::sys_reset();
     }
 }
 

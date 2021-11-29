@@ -91,7 +91,7 @@ Theres a softdevice and bootloader prebuilt and included here, but you may want 
 
 * Download [nrf5 SDK 17](https://www.nordicsemi.com/Products/Development-software/nRF5-SDK/Download#infotabs) and unzip it somewhere
 * `cp public_key.c ~/nRF5_SDK_17.0.2_d674dde/examples/dfu/dfu_public_key.c`
-* change to that direction, for instance `cd ~/nRF5_SDK_17.0.2_d674dde`
+* change to that directory, for instance `cd ~/nRF5_SDK_17.0.2_d674dde`
 * `git clone https://github.com/kmackay/micro-ecc.git external/micro-ecc/micro-ecc`
 * `cd external/micro-ecc/nrf52hf_armgcc/armgcc`
 * `make`
