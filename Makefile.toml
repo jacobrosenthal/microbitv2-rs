@@ -59,7 +59,7 @@ command = "probe-rs-cli"
 args = ["reset", "--chip", "nRF52833_xxAA"]
 
 [tasks.objcopy-application]
-install_crate = "cargo-objcopy"
+install_crate = "cargo-binutils"
 command = "cargo"
 args = ["objcopy", "--release", "--", "-O", "ihex", "target/nrf52833-mdk.hex"]
 dependencies = ["install-llvm-tools-preview"]
@@ -114,6 +114,3 @@ install_crate = { rustup_component_name = "llvm-tools-preview" }
 
 [tasks.install-probe-rs-cli]
 install_crate = "probe-rs-cli"
-
-[tasks.install-cargo-objcopy]
-install_crate = "cargo-objcopy"

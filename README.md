@@ -35,7 +35,7 @@ $ cargo run --release
 
 Using the bootloader means we can't use our probe-run workflow anymore so you'd probably not use this method until you need it. When that time comes you'll need to flash a secure bootloader and sign your compiled files with a few more dependencies:
 
-* `pip install nrfutil`
+* `pip3 install nrfutil`
 * `cargo install cargo-make`
 
 There's a private.key (which thus isn't particuarly private but good enough for testing) as well as the corresponding bootloader, with the public key, included in this directory. We can upload the softdevice and the secure bootloader to a connected device with:
