@@ -3,20 +3,34 @@ use embassy_nrf::gpio::{self, AnyPin};
 use embassy_nrf::gpiote::{AnyChannel, InputChannel};
 use embedded_hal::digital::v2::OutputPin;
 use futures::FutureExt;
-use nrf_softdevice::ble::{gatt_server, peripheral};
+use nrf_softdevice::ble::{gatt_server, peripheral, Connection};
 use nrf_softdevice::{raw, Softdevice};
-
-// Define a bluetooth service with one characteristic we can write and read to
-#[nrf_softdevice::gatt_service(uuid = "9e7312e0-2354-11eb-9f10-fbc30a62cf38")]
-struct MyService {
-    #[characteristic(uuid = "9e7312e0-2354-11eb-9f10-fbc30a63cf38", read, write)]
-    my_char: u8,
-}
 
 // Create the gatt server with however many services we've defined
 #[nrf_softdevice::gatt_server]
-struct Server {
-    my_service: MyService,
+pub struct Server {
+    led: LedService,
+    dfu: DfuService,
+}
+
+// For over the air updating
+#[nrf_softdevice::gatt_service(uuid = "fe59")]
+pub struct DfuService {
+    #[characteristic(uuid = "8ec90003-f315-4f60-9fb8-838830daea50", write, notify, indicate)]
+    dfu: heapless::Vec<u8, 16>,
+}
+
+// Define a bluetooth service with one characteristic we can write and read to
+#[nrf_softdevice::gatt_service(uuid = "9e7312e0-2354-11eb-9f10-fbc30a62cf38")]
+pub struct LedService {
+    #[characteristic(
+        uuid = "9e7312e0-2354-11eb-9f10-fbc30a63cf38",
+        read,
+        write,
+        notify,
+        indicate
+    )]
+    led: u8,
 }
 
 #[embassy::task]
@@ -65,14 +79,29 @@ pub async fn bluetooth_task(
         };
 
         let gatt_future = gatt_server::run(&conn, &server, |e| match e {
-            ServerEvent::MyService(e) => match e {
-                MyServiceEvent::MyCharWrite(val) => {
+            ServerEvent::Dfu(DfuServiceEvent::DfuWrite(val)) => dfu_task(sd, &server, &conn, val),
+            ServerEvent::Dfu(DfuServiceEvent::DfuCccdWrite { .. }) => {}
+            ServerEvent::Led(e) => match e {
+                LedServiceEvent::LedWrite(val) => {
+                    info!("wrote led: {}", val);
+                    if let Err(e) = server.led.led_notify(&conn, val + 1) {
+                        info!("send notification error: {:?}", e);
+                    }
+
                     if val > 0 {
                         unwrap!(led5.set_low());
                     } else {
                         unwrap!(led5.set_high());
                     }
-                    info!("wrote my_char: {}", val);
+                }
+                LedServiceEvent::LedCccdWrite {
+                    indications,
+                    notifications,
+                } => {
+                    info!(
+                        "foo indications: {}, notifications: {}",
+                        indications, notifications
+                    )
                 }
             },
         });
@@ -84,6 +113,39 @@ pub async fn bluetooth_task(
             // button returns if pressed
             _ = button1.wait().fuse() => info!("disconnecting"),
         };
+    }
+}
+
+pub fn dfu_task(
+    _sd: &'static Softdevice,
+    server: &Server,
+    conn: &Connection,
+    val: heapless::Vec<u8, 16>,
+) {
+    info!("wrote dfu instruction: {}", &val[..]);
+
+    if val[0] == DFU_OP_ENTER_BOOTLOADER {
+        // enter DFU mode
+        unsafe {
+            raw::sd_power_gpregret_clr(0, 0);
+            let gpregret_mask = (0xB0 | 0x01) as u32;
+            raw::sd_power_gpregret_set(0, gpregret_mask);
+        }
+
+        let mut resp: heapless::Vec<u8, 16> = heapless::Vec::new();
+        resp.push(DFU_OP_RESPONSE_CODE).unwrap();
+        resp.push(DFU_OP_ENTER_BOOTLOADER).unwrap();
+        resp.push(DFU_RSP_SUCCESS).unwrap();
+
+        // NOTE that indications are not yet supported but we need one for the nrf connect python app to work
+        if let Err(e) = server.dfu.dfu_notify(conn, resp) {
+            info!("send notification error: {:?}", e);
+        }
+
+        // delay(80000000); // not sure if this is required (1 second delay)
+
+        info!("gpregret_mask set. Soft resetting defice...");
+        cortex_m::peripheral::SCB::sys_reset();
     }
 }
 
@@ -103,7 +165,7 @@ pub fn softdevice_config() -> nrf_softdevice::Config {
             source: raw::NRF_CLOCK_LF_SRC_RC as u8,
             rc_ctiv: 16,
             rc_temp_ctiv: 2,
-            accuracy: raw::NRF_CLOCK_LF_ACCURACY_20_PPM as u8,
+            accuracy: raw::NRF_CLOCK_LF_ACCURACY_500_PPM as u8,
         }),
         conn_gap: Some(raw::ble_gap_conn_cfg_t {
             conn_count: 1,
@@ -129,3 +191,11 @@ pub fn softdevice_config() -> nrf_softdevice::Config {
         ..Default::default()
     }
 }
+
+const DFU_OP_RESPONSE_CODE: u8 = 0x20;
+const DFU_OP_ENTER_BOOTLOADER: u8 = 0x01;
+const DFU_OP_SET_ADV_NAME: u8 = 0x02;
+const DFU_RSP_SUCCESS: u8 = 0x01;
+const _DFU_RSP_BUSY: u8 = 0x06;
+const _DFU_RSP_OPERATION_FAILED: u8 = 0x04;
+const DFU_RSP_OP_CODE_NOT_SUPPORTED: u8 = 0x02;

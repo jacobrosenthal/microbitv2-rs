@@ -1,0 +1,116 @@
+# cargo make first
+[tasks.first]
+dependencies = ["flash-softdevice", "flash-bootloader", "reset"]
+
+# cargo make --env APP=1 flash
+[tasks.flash]
+dependencies = ["flash-application", "reset"]
+
+# cargo make --env APP=1 pkg
+[tasks.pkg]
+condition = { env_set = ["APP"] }
+command = "nrfutil"
+args = [
+    "pkg",
+    "generate",
+    "--hw-version",
+    "52",
+    "--application-version",
+    "${APP}",
+    "--application",
+    "target/nrf52833-mdk.hex",
+    "--sd-req",
+    "0x0102",
+    "--key-file",
+    "private.key",
+    "target/app_dfu_package.zip"
+]
+dependencies = ["objcopy-application"]
+
+####
+[tasks.flash-softdevice]
+install_crate = "probe-rs-cli"
+command = "probe-rs-cli"
+args = [
+    "download",
+    "--format",
+    "hex",
+    "s113_nrf52_7.2.0_softdevice.hex",
+    "--chip",
+    "nRF52833_xxAA",
+    "--chip-erase"
+]
+
+[tasks.flash-bootloader]
+install_crate = "probe-rs-cli"
+command = "probe-rs-cli"
+args = [
+    "download",
+    "--format",
+    "hex",
+    "nrf52833_xxaa_s113.hex",
+    "--chip",
+    "nRF52833_xxAA"
+]
+
+[tasks.reset]
+install_crate = "probe-rs-cli"
+command = "probe-rs-cli"
+args = ["reset", "--chip", "nRF52833_xxAA"]
+
+[tasks.objcopy-application]
+install_crate = "cargo-binutils"
+command = "cargo"
+args = ["objcopy", "--release", "--", "-O", "ihex", "target/nrf52833-mdk.hex"]
+dependencies = ["install-llvm-tools-preview"]
+
+[tasks.build-settings]
+condition = { env_set = ["APP"] }
+command = "nrfutil"
+args = [
+    "settings",
+    "generate",
+    "--family",
+    "NRF52",
+    "--application",
+    "target/nrf52833-mdk.hex",
+    "--application-version",
+    "${APP}",
+    "--bootloader-version",
+    "0",
+    "--bl-settings-version",
+    "2",
+    "target/bootloader_setting.hex"
+]
+dependencies = ["objcopy-application"]
+
+[tasks.flash-settings]
+install_crate = "probe-rs-cli"
+command = "probe-rs-cli"
+args = [
+    "download",
+    "--format",
+    "hex",
+    "target/bootloader_setting.hex",
+    "--chip",
+    "nRF52833_xxAA"
+]
+
+[tasks.flash-application]
+install_crate = "probe-rs-cli"
+command = "probe-rs-cli"
+args = [
+    "download",
+    "--format",
+    "hex",
+    "target/nrf52833-mdk.hex",
+    "--chip",
+    "nRF52833_xxAA"
+]
+dependencies = ["build-settings", "flash-settings"]
+
+[tasks.install-llvm-tools-preview]
+install_crate = { rustup_component_name = "llvm-tools-preview" }
+
+[tasks.install-probe-rs-cli]
+install_crate = "probe-rs-cli"
